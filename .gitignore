@@ -1,0 +1,17 @@
+# Secrets
+.env
+API_Keys.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+
+# Local artifacts
+venue_raw.html
+*.log
