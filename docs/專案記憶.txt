@@ -17,7 +17,7 @@
 建立日期: 2026-05-06
 最後更新: [請填寫]
 使用者偏好: 
-  - 通知平台: Telegram Bot
+  - 通知平臺: Telegram Bot
   - 監控場地: 溪洲[福和]河濱公園網球場 (ID: 352)
   - 目標時段: 週末上午 + 平日夜間 (可調整)
   - 風險偏好: 低風險，避免頻繁爬蟲，以使用者觸發為主
@@ -30,7 +30,7 @@
 ```
 ✅ 核心功能
 1. 使用者透過 Telegram Bot 發送指令（如 /check 5/15-5/20）
-2. 系統单次抓取臺北體育局租借網頁
+2. 系統單次抓取臺北體育局租借網頁
 3. 用 Gemini AI 過濾 + 整理成易讀格式
 4. 回傳可用時段 + 注意事項
 
@@ -62,7 +62,7 @@ VENUE_BASE_URL=https://vbs.sports.taipei/venues/?K=352
 ```
 tennis-monitor/
 ├── bot.py              # Telegram Bot 主程式
-├── scraper.py          # 单次抓取模組（低風險設計）
+├── scraper.py          # 單次抓取模組（低風險設計）
 ├── ai_helper.py        # Gemini 整合：需求解析 + 回覆生成
 ├── config.py           # 設定檔 + 環境變數讀取
 ├── requirements.txt    # Python 套件清單 (需包含 google-genai, python-telegram-bot, bs4, requests)
@@ -73,14 +73,14 @@ tennis-monitor/
 
 ## 🧩 已完成程式碼片段（可直接複製使用）
 
-### ▶️ `scraper.py` - 低風險单次抓取
+### ▶️ `scraper.py` - 低風險單次抓取
 ```python
 import requests, time, random
 from bs4 import BeautifulSoup
 
 def fetch_venue_slots(venue_id="352", target_dates=None):
     """
-    单次抓取場地時段，加入隨機延遲模擬真人
+    單次抓取場地時段，加入隨機延遲模擬真人
     返回：list of {date, time, status, booker}
     """
     url = f"https://vbs.sports.taipei/venues/?K={venue_id}"
@@ -106,10 +106,10 @@ def fetch_venue_slots(venue_id="352", target_dates=None):
                 'status': 'booked' if item.get('data-booked') == '1' else 'available',
                 'booker': item.get('data-booker-name', '').strip()
             }
-            # 過濾：只保留目標日期 + 台灣網球協會相關
+            # 過濾：只保留目標日期 + 臺灣網球協會相關
             if target_dates and slot['date'] not in target_dates:
                 continue
-            if slot['booker'] and '台灣網球協會' in slot['booker']:
+            if slot['booker'] and '臺灣網球協會' in slot['booker']:
                 slots.append(slot)
         return slots
     except Exception as e:
@@ -132,7 +132,7 @@ def generate_telegram_reply(slots, user_query):
     你是網球場租借小助手，用繁體中文、親切簡潔風格回覆。
     
     使用者查詢：{user_query}
-    找到 {len(slots)} 筆「台灣網球協會」相關預訂：
+    找到 {len(slots)} 筆「臺灣網球協會」相關預訂：
     {slots}
     
     請輸出：
@@ -182,7 +182,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # dates = parse_date_range(user_query) 
     dates = None # 測試用
     
-    # 2. 单次抓取
+    # 2. 單次抓取
     slots = scraper.fetch_venue_slots(target_dates=dates)
     
     # 3. AI 整理回覆
@@ -220,7 +220,7 @@ if __name__ == "__main__":
 
 ✅ 部署準備
 - [ ] 本地測試通過
-- [ ] 選擇部署平台（Render / Railway / 本地常駐）
+- [ ] 選擇部署平臺（Render / Railway / 本地常駐）
 - [ ] 設定監控日誌（簡易版：print + 檔案記錄）
 ```
 

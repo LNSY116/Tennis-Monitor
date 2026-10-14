@@ -131,7 +131,7 @@ def parse_query_dates(user_query: str) -> list:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🎾 *網球場監控小助手*\n\n"
-        "我會幫您即時監控台北市網球場的租借情形。您可以直接用「自然語言」跟我對話，或是使用下方的指令：\n\n"
+        "我會幫您即時監控臺北市網球場的租借情形。您可以直接用「自然語言」跟我對話，或是使用下方的指令：\n\n"
         "💬 *您可以這樣說：*\n"
         "「幫我查明天有沒有空位」\n"
         "「下週三如果有位子請通知我」\n"
