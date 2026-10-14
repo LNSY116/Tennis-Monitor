@@ -1,5 +1,11 @@
 import os
 import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -10,8 +16,8 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-# 1. 載入 .env
-load_dotenv()
+# 1. 載入根目錄的 .env
+load_dotenv(ROOT_DIR / ".env")
 
 # 2. 初始化 API
 api_key = os.getenv("GOOGLE_API_KEY")

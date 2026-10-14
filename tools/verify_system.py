@@ -4,6 +4,15 @@
 """
 import sys
 import os
+from pathlib import Path
+
+# 將專案根目錄與 src 加入模組路徑
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 if sys.platform == "win32":
     try:
@@ -17,7 +26,7 @@ print("🔍 開始驗證 Tennis Monitor 系統...\n")
 # 1. 環境變數驗證
 print("✅ 步驟 1: 檢查環境變數")
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(ROOT_DIR / ".env")
 
 required_env_vars = {
     "TELEGRAM_BOT_TOKEN": "Telegram Bot Token",

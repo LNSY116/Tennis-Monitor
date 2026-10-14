@@ -45,68 +45,46 @@ flowchart TD
 
 ## 🚀 快速開始
 
-### 1. 複製專案
+### ⚡ 方案 A：非工程人員 30 秒一鍵啟動（推薦）
+
+如果你不熟悉指令列，只要簡單兩步：
+
+1. **填寫金鑰**：
+   將專案目錄下的 `.env.example` 複製一份並重新命名為 `.env`，使用記事本開啟並填入你的 `TELEGRAM_BOT_TOKEN` 與 `GOOGLE_API_KEY`。
+2. **雙擊啟動**：
+   - **Windows 使用者**：直接連按兩下專案根目錄的 **`start.bat`**。
+   - **macOS / Linux 使用者**：執行 `./start.sh`。
+
+> 💡 `start.bat` 會自動檢查 Python、自動建立虛擬環境、自動安裝所需套件，並一鍵啟動機器人，完全免手動敲指令！
+
+---
+
+### 💻 方案 B：工程人員手動指令啟動
 
 ```bash
+# 1. 複製專案
 git clone https://github.com/LNSY116/Tennis-Monitor.git
 cd Tennis-Monitor
-```
 
-### 2. 安裝相依套件
-
-建議使用虛擬環境：
-
-```bash
+# 2. 建立並啟用虛擬環境
 python -m venv venv
-# Windows 啟用虛擬環境:
+# Windows:
 venv\Scripts\activate
-# Linux/macOS 啟用虛擬環境:
+# Linux/macOS:
 # source venv/bin/activate
 
+# 3. 安裝相依套件
 pip install -r requirements.txt
-```
 
-### 3. 設定環境變數
-
-複製環境變數範本並填入你的金鑰：
-
-```bash
+# 4. 設定環境變數 (.env)
 cp .env.example .env
-```
+# 請編輯 .env 填入金鑰
 
-編輯 `.env` 檔案：
+# 5. 系統一鍵診斷 (選用)
+python tools/verify_system.py
 
-```env
-# Telegram Bot 配置 (向 @BotFather 取得)
-TELEGRAM_BOT_TOKEN=你的_TELEGRAM_BOT_TOKEN
-TELEGRAM_CHAT_ID=你的_CHAT_ID
-
-# Google Gemini API 配置 (向 Google AI Studio 取得)
-GOOGLE_API_KEY=你的_GEMINI_API_KEY
-
-# 場地配置 (預設 352 為彩虹網球場)
-VENUE_ID=352
-VENUE_BASE_URL=https://vbs.sports.taipei/venues/?K=352
-
-# 請求與監控設定
-REQUEST_DELAY_MIN=2
-REQUEST_DELAY_MAX=5
-REQUEST_TIMEOUT=15
-MONITOR_INTERVAL=120
-```
-
-### 4. 系統驗證
-
-在啟動前執行內建的診斷腳本，驗證環境變數、模組依賴與 API 連線：
-
-```bash
-python verify_system.py
-```
-
-### 5. 啟動機器人
-
-```bash
-python bot.py
+# 6. 啟動主程式
+python main.py
 ```
 
 ---
@@ -132,20 +110,29 @@ python bot.py
 
 ---
 
-## 📁 專案結構
+## 📁 簡潔專案架構
 
 ```text
 Tennis-Monitor/
-├── bot.py             # Telegram Bot 主程式與指令處理
-├── scraper.py         # 臺北市體育局場地 XHR 爬蟲引擎
-├── ai_helper.py       # Google Gemini 意圖推理與自然語言回覆模組
-├── config.py          # 設定檔載入與環境變數校驗
-├── check_models.py    # Gemini API 可用模型診斷工具
-├── verify_system.py   # 系統自我檢驗端到端測試腳本
-├── requirements.txt   # 專案相依套件清單
+├── start.bat          # 🖱️ Windows 非工程人員雙擊一鍵安裝啟動腳本
+├── start.sh           # 🖱️ Linux / macOS 一鍵啟動腳本
+├── main.py            # 🚀 專案唯一主程式入口
+├── requirements.txt   # 相依套件清單
 ├── .env.example       # 環境變數設定範本
-├── docs/              # 開發歷程與技術診斷報告
-└── README.md          # 專案說明文件
+├── README.md          # 專案完整說明文件
+├── LICENSE            # MIT 開源授權合約
+│
+├── src/               # 📦 核心業務模組
+│   ├── bot.py         # Telegram Bot 核心與自然語言處理
+│   ├── scraper.py     # 臺北市體育局場地 XHR 爬蟲引擎
+│   ├── ai_helper.py   # Gemini AI 意圖分析與對話格式化
+│   └── config.py      # 環境設定與參數驗證
+│
+├── tools/             # 🛠️ 輔助與診斷工具
+│   ├── verify_system.py # 系統自我端到端驗證工具
+│   └── check_models.py  # Gemini API 可用模型清單查詢工具
+│
+└── docs/              # 📚 歷史開發與排錯診斷報告
 ```
 
 ---
@@ -154,11 +141,11 @@ Tennis-Monitor/
 
 - **查詢可用的 Gemini 模型**：
   ```bash
-  python check_models.py
+  python tools/check_models.py
   ```
 - **系統完整檢測**：
   ```bash
-  python verify_system.py
+  python tools/verify_system.py
   ```
 
 ---

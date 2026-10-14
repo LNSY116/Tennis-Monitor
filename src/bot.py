@@ -362,19 +362,19 @@ def format_slot_reply(slots: list, requested_dates: list) -> str:
 
     return "\n".join(lines)
 
-if __name__ == "__main__":
-    # 驗證所有必要配置
+def run_bot():
+    """啟動 Telegram Bot 的主函式"""
     try:
         validate_config()
         print("✅ 配置驗證通過")
     except ValueError as e:
         print(f"❌ 配置錯誤: {e}")
         exit(1)
-    
+
     if not BOT_TOKEN:
         print("❌ 找不到 TELEGRAM_BOT_TOKEN，請檢查 .env 檔案")
         exit(1)
-        
+
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("check", check_command))
@@ -382,19 +382,23 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("stop", stop_command))
     app.add_handler(CommandHandler("list", list_command))
     app.add_handler(CommandHandler("help", start))
-    
+
     # 加入自然語言處理
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
+
     # 設定背景任務，每 2 分鐘執行一次
     job_queue = app.job_queue
     job_queue.run_repeating(monitor_job, interval=MONITOR_INTERVAL, first=10)
-    
+
     async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
         logger.exception("Unhandled bot error", exc_info=context.error)
         if isinstance(update, Update) and update.effective_message:
             await update.effective_message.reply_text("⚠️ 查詢時發生錯誤，請稍後再試一次。")
 
     app.add_error_handler(handle_error)
-    print("✅ Bot 已啟動，正在等待指令...")
+    print("✅ Bot 已啟動，正在等待指令 (按 Ctrl+C 可停止)...")
     app.run_polling()
+
+
+if __name__ == "__main__":
+    run_bot()
