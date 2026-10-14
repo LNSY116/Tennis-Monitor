@@ -16,15 +16,11 @@ cp .env.example .env
 - `GOOGLE_API_KEY`：Google Gemini API Key
 - `VENUE_ID`：場地代碼（預設 `352` 為彩虹網球場）
 
-### 2. 啟動服務
-- **自動化啟動**：
-  - Windows：執行 `start.bat`
-  - Linux / macOS：執行 `./start.sh`
-- **手動指令啟動**：
-  ```bash
-  pip install -r requirements.txt
-  python main.py
-  ```
+### 2. 安裝套件與啟動服務
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
 ---
 
@@ -45,14 +41,13 @@ cp .env.example .env
 
 ```text
 Tennis-Monitor/
-├── start.bat          # Windows 自動化啟動腳本
-├── start.sh           # Linux / macOS 啟動腳本
-├── main.py            # 主程式進入點
-├── requirements.txt   # 相依套件
-├── .env.example       # 設定檔範本
 ├── src/               # 核心邏輯 (bot, scraper, ai_helper, config)
-├── tools/             # 檢驗工具 (verify_system, check_models)
-└── docs/              # 技術文件與歷程記錄
+├── .env.example       # 環境變數設定範本
+├── .gitignore         # Git 忽略檔案設定
+├── LICENSE            # MIT 授權條款
+├── main.py            # 主程式進入點
+├── README.md          # 專案說明文件
+└── requirements.txt   # 相依套件清單
 ```
 
 ---
