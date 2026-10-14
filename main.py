@@ -1,6 +1,9 @@
 """
-Tennis Court Monitor - 專案唯一主程式入口
-執行方式：python main.py
+Tennis Court Monitor
+服務主程式進入點 (Application Entry Point)
+
+執行方式：
+    python main.py
 """
 import sys
 from pathlib import Path
