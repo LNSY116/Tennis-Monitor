@@ -1,14 +1,27 @@
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-import scraper, ai_helper
-from config import validate_config, MONITOR_INTERVAL
-from dotenv import load_dotenv
+import asyncio
+import calendar
+from collections import defaultdict
+from datetime import datetime
+import json
+import logging
 import os
 import re
-from collections import defaultdict
-import logging
-import asyncio
-import json
+import sys
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+from dotenv import load_dotenv
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+
+import ai_helper
+from config import MONITOR_INTERVAL, validate_config
+import scraper
 
 load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -28,23 +41,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def safe_send_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str, parse_mode: str = "Markdown"):
+    """安全發送訊息，若 Markdown 解析失敗則自動降級為純文字發送，防止 Bot 拋錯中斷"""
+    try:
+        return await context.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
+    except Exception as e:
+        logger.warning("以 parse_mode=%s 發送訊息失敗 (%s)，降級為純文字發送", parse_mode, e)
+        return await context.bot.send_message(chat_id=chat_id, text=text)
+
+
 def parse_query_dates(user_query: str) -> list:
     """從指令提取日期，支援單日/區間/緊湊格式 (MMDD)/中文日期，統一轉為 MM/DD"""
     if not user_query:
         return []
 
     dates = set()
-    
-    # 0. 基礎中文數字轉換（簡單處理常見的）
+    current_year = datetime.now().year
+
+    # 0. 基礎中文數字轉換
     cn_nums = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
-    
+
     def cn_to_int(s):
-        if not s: return 0
-        if s == '十': return 10
-        if len(s) == 1: return cn_nums.get(s, 0)
+        if not s:
+            return 0
+        if s == '十':
+            return 10
+        if len(s) == 1:
+            return cn_nums.get(s, 0)
         if len(s) == 2:
-            if s[0] == '十': return 10 + cn_nums.get(s[1], 0)
-            if s[1] == '十': return cn_nums.get(s[0], 0) * 10
+            if s[0] == '十':
+                return 10 + cn_nums.get(s[1], 0)
+            if s[1] == '十':
+                return cn_nums.get(s[0], 0) * 10
         if len(s) == 3:
             return cn_nums.get(s[0], 0) * 10 + cn_nums.get(s[2], 0)
         return 0
@@ -55,15 +83,12 @@ def parse_query_dates(user_query: str) -> list:
         dates.add(f"{int(m):02d}/{int(d):02d}")
 
     # 2. 處理 MMDD 或 MDD 緊湊格式 (例如 0520, 520)
-    # 支援 4 位 (MMDD) 或 3 位 (MDD)
-    # 4 位：0520 -> 05/20
     pattern4 = re.findall(r'(?<!\d)(\d{2})(\d{2})(?!\d)', user_query)
     for m, d in pattern4:
         month, day = int(m), int(d)
         if 1 <= month <= 12 and 1 <= day <= 31:
             dates.add(f"{month:02d}/{day:02d}")
-            
-    # 3 位：520 -> 05/20
+
     pattern3_digit = re.findall(r'(?<!\d)(\d{1})(\d{2})(?!\d)', user_query)
     for m, d in pattern3_digit:
         month, day = int(m), int(d)
@@ -78,26 +103,25 @@ def parse_query_dates(user_query: str) -> list:
             dates.add(f"{m:02d}/{d:02d}")
 
     # 4. 處理範圍格式 (例如 5/18-19, 5/18-5/20, 0518-20, 0518-0520)
-    # 4.1 標準範圍 (帶分隔符)
     range_match = re.search(r'(\d{1,2})[月/-](\d{1,2})\s*-\s*(?:(\d{1,2})[月/-])?(\d{1,2})', user_query)
-    # 4.2 緊湊範圍 (MMDD-DD 或 MMDD-MMDD)
     compact_range_match = re.search(r'(?<!\d)(\d{2})(\d{2})\s*-\s*(?:(\d{2}))?(\d{2})(?!\d)', user_query)
-    
+
     if range_match or compact_range_match:
         if compact_range_match:
             m1, d1, m2, d2 = compact_range_match.groups()
         else:
             m1, d1, m2, d2 = range_match.groups()
-            
+
         start_m, start_d = int(m1), int(d1)
         end_m = int(m2) if m2 else start_m
         end_d = int(d2)
-        
-        if end_m == start_m and end_d > start_d:
+
+        if end_m == start_m and end_d >= start_d:
             for day in range(start_d, end_d + 1):
                 dates.add(f"{start_m:02d}/{day:02d}")
         elif end_m > start_m:
-            for day in range(start_d, 32): 
+            days_in_start_m = calendar.monthrange(current_year, start_m)[1]
+            for day in range(start_d, days_in_start_m + 1):
                 dates.add(f"{start_m:02d}/{day:02d}")
             for day in range(1, end_d + 1):
                 dates.add(f"{end_m:02d}/{day:02d}")
@@ -204,7 +228,7 @@ async def monitor_job(context: ContextTypes.DEFAULT_TYPE):
             
             if relevant_new_slots:
                 msg = "🔔 *偵測到新空位！*\n\n" + "\n".join(relevant_new_slots) + "\n\n快去預訂吧！"
-                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                await safe_send_message(context, chat_id=chat_id, text=msg, parse_mode="Markdown")
                 logger.info("Sent notification to %s for %s", chat_id, relevant_new_slots)
 
     except Exception:
@@ -245,7 +269,7 @@ async def perform_check(update: Update, context: ContextTypes.DEFAULT_TYPE, pars
                 reply = ai_helper.generate_telegram_reply(alerts)
 
         if chat_id is not None:
-            await context.bot.send_message(chat_id=chat_id, text=reply, parse_mode="Markdown")
+            await safe_send_message(context, chat_id=chat_id, text=reply, parse_mode="Markdown")
     except Exception:
         logger.exception("perform_check failed")
         if update.effective_chat:

@@ -1,15 +1,60 @@
-import os
-import time
 import json
-import google.generativeai as genai
+import logging
+import os
+import re
+import time
 from datetime import datetime
+
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 # 初始化 Gemini API
 api_key = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=api_key)
+
+# 優先模型與備援模型清單（已驗證可用）
+MODEL_PRIORITY = [
+    "gemini-2.5-flash",
+    "gemini-3.8-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+]
+
+
+def _call_gemini(prompt: str, temperature: float = 0.3, response_mime_type: str = None) -> str:
+    """統一的 Gemini 呼叫函式，包含多模型輪詢與重試備援機制"""
+    config_kwargs = {"temperature": temperature}
+    if response_mime_type:
+        config_kwargs["response_mime_type"] = response_mime_type
+
+    generation_config = genai.types.GenerationConfig(**config_kwargs)
+
+    for model_name in MODEL_PRIORITY:
+        full_model_name = model_name if model_name.startswith("models/") else f"models/{model_name}"
+        for attempt in range(2):
+            try:
+                model = genai.GenerativeModel(full_model_name)
+                response = model.generate_content(prompt, generation_config=generation_config)
+                return response.text.strip()
+            except Exception as e:
+                error_msg = str(e)
+                if "depleted" in error_msg or "billing" in error_msg:
+                    logger.warning("模型 %s 配額或點數耗盡: %s", model_name, e)
+                    break
+                elif "503" in error_msg or "429" in error_msg:
+                    wait_time = (attempt + 1) * 2
+                    logger.warning("模型 %s 忙碌中，%s 秒後重試... (%d/2)", model_name, wait_time, attempt + 1)
+                    time.sleep(wait_time)
+                else:
+                    logger.warning("模型 %s 發生錯誤: %s", model_name, e)
+                    break
+
+    raise RuntimeError("所有可用 Gemini 模型皆無法回應")
+
 
 def generate_telegram_reply(alerts):
     """產生回覆，具備自動重試與模型備援機制"""
@@ -36,38 +81,12 @@ def generate_telegram_reply(alerts):
 5. 不要輸出你沒有根據的額外資訊。
 """
 
-    # 優先模型與備援模型清單（根據環境實際可用模型更新）
-    model_priority = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-pro-latest'
-    ]
+    try:
+        return _call_gemini(prompt, temperature=0.3)
+    except Exception as e:
+        logger.error("generate_telegram_reply 失敗: %s", e)
+        return "😰 抱歉，目前 AI 服務端壓力過大，所有模型均暫時無法回應，請幾分鐘後再試！🎾"
 
-    for model_name in model_priority:
-        # 每個模型嘗試重試 2 次
-        for attempt in range(2):
-            try:
-                # 確保模型名稱正確，有些環境需要 models/ 前綴
-                full_model_name = model_name if model_name.startswith("models/") else f"models/{model_name}"
-                model = genai.GenerativeModel(full_model_name)
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(temperature=0.3)
-                )
-                return response.text
-            except Exception as e:
-                error_msg = str(e)
-                # 如果是忙線 (503) 或 配額問題 (429)
-                if "503" in error_msg or "429" in error_msg:
-                    wait_time = (attempt + 1) * 3  # 遞增等待時間
-                    print(f"⚠️ 模型 {model_name} 忙碌中，{wait_time}秒後重試... (嘗試 {attempt+1}/2)")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    print(f"❌ 模型 {model_name} 發生非預期錯誤: {e}")
-                    break  # 跳到下一個模型
-        
-    return "😰 抱歉，目前 AI 服務端壓力過大，所有模型均暫時無法回應，請幾分鐘後再試！🎾"
 
 def analyze_user_intent(user_text, history=None):
     """
@@ -110,31 +129,16 @@ def analyze_user_intent(user_text, history=None):
 JSON 輸出：
 """
 
-    model_priority = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-pro-latest']
-
-    for model_name in model_priority:
-        try:
-            full_model_name = model_name if model_name.startswith("models/") else f"models/{model_name}"
-            model = genai.GenerativeModel(full_model_name)
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json"
-                )
-            )
-            # 移除可能的 Markdown 標籤
-            text = response.text.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.endswith("```"):
-                text = text[:-3]
-            return json.loads(text.strip())
-        except Exception as e:
-            print(f"⚠️ 意圖分析模型 {model_name} 失敗: {e}")
-            continue
+    try:
+        raw_text = _call_gemini(prompt, temperature=0.1, response_mime_type="application/json")
+        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+    except Exception as e:
+        logger.error("analyze_user_intent 失敗: %s", e)
 
     return {"intent": "chat", "dates": [], "reply": "抱歉，我現在有點困惑，您可以試著用指令 `/check` 或 `/monitor` 來告訴我您想做什麼嗎？"}
+
 
 def format_ai_response(user_request, scraped_data):
     """
@@ -160,19 +164,8 @@ def format_ai_response(user_request, scraped_data):
 請直接輸出回覆內容：
 """
 
-    model_priority = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-pro-latest']
-
-    for model_name in model_priority:
-        try:
-            full_model_name = model_name if model_name.startswith("models/") else f"models/{model_name}"
-            model = genai.GenerativeModel(full_model_name)
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(temperature=0.3)
-            )
-            return response.text.strip()
-        except Exception as e:
-            print(f"⚠️ 資料格式化模型 {model_name} 失敗: {e}")
-            continue
-
-    return "抱歉，我現在無法處理回覆格式，請稍後再試。"
+    try:
+        return _call_gemini(prompt, temperature=0.3)
+    except Exception as e:
+        logger.error("format_ai_response 失敗: %s", e)
+        return "抱歉，我現在無法處理回覆格式，請稍後再試。"

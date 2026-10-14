@@ -5,6 +5,13 @@
 import sys
 import os
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 print("🔍 開始驗證 Tennis Monitor 系統...\n")
 
 # 1. 環境變數驗證

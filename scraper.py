@@ -5,9 +5,15 @@ import time
 from datetime import datetime
 
 import requests
+from config import (
+    VENUE_ID as DEFAULT_VENUE_ID,
+    REQUEST_DELAY_MIN,
+    REQUEST_DELAY_MAX,
+    REQUEST_TIMEOUT,
+)
 
 
-def fetch_venue_slots(venue_id="352", target_dates=None):
+def fetch_venue_slots(venue_id=None, target_dates=None):
     """
     抓取場地時段資料。
 
@@ -15,7 +21,8 @@ def fetch_venue_slots(venue_id="352", target_dates=None):
     `/_/x/xhrworkv3.php` 取得 JSON 後渲染，因此要先建立站內 session。
     回傳格式：{"slots": [{"date", "time", "status", "booker"}], "alerts": []}
     """
-    page_url = f"https://vbs.sports.taipei/venues/?K={venue_id}"
+    target_venue_id = venue_id or DEFAULT_VENUE_ID
+    page_url = f"https://vbs.sports.taipei/venues/?K={target_venue_id}"
     xhr_url = "https://vbs.sports.taipei/_/x/xhrworkv3.php"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -25,11 +32,12 @@ def fetch_venue_slots(venue_id="352", target_dates=None):
         "Origin": "https://vbs.sports.taipei",
     }
 
-    time.sleep(random.uniform(2, 5))
+    if REQUEST_DELAY_MAX > 0:
+        time.sleep(random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX))
 
     try:
         session = requests.Session()
-        page_response = session.get(page_url, headers=headers, timeout=20)
+        page_response = session.get(page_url, headers=headers, timeout=REQUEST_TIMEOUT)
         page_response.raise_for_status()
         page_response.encoding = "utf-8"
 
@@ -47,14 +55,14 @@ def fetch_venue_slots(venue_id="352", target_dates=None):
                 "SM": str(month),
                 "RSD": f"{year}-{month}-1",
                 "RED": f"{year}-{month}-30",
-                "VenueSN": _extract_venue_sn(page_response.text, venue_id),
+                "VenueSN": _extract_venue_sn(page_response.text, target_venue_id),
                 "OrderNo": "",
                 "ZRMode": "",
                 "ZRTTimes": "",
                 "AddOrderMode": "",
             }
 
-            xhr_response = session.post(xhr_url, headers=headers, data=payload, timeout=20)
+            xhr_response = session.post(xhr_url, headers=headers, data=payload, timeout=REQUEST_TIMEOUT)
             xhr_response.raise_for_status()
 
             data = _safe_json_loads(xhr_response.text)
@@ -109,10 +117,14 @@ def _build_month_list(start_cfg, end_cfg, target_dates):
     """建立要抓取的月份列表。若指定 target_dates，則只抓對應月份。"""
     if target_dates:
         months = set()
+        start_year, start_month = start_cfg
         for date_text in target_dates:
             parts = date_text.replace("-", "/").split("/")
             if len(parts) == 2:
-                months.add((start_cfg[0], int(parts[0])))
+                target_month = int(parts[0])
+                # 若查詢月份小於當前可視範圍起始月，視為跨年 (例如 12 月查 1 月)
+                target_year = start_year + 1 if target_month < start_month else start_year
+                months.add((target_year, target_month))
         return sorted(months)
 
     months = []
