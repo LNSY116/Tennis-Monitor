@@ -29,16 +29,16 @@
 
 ```mermaid
 flowchart TD
-    User([使用者 Telegram]) <--> Bot[Telegram Bot (bot.py)]
+    User(["使用者 Telegram"]) <--> Bot["Telegram Bot (bot.py)"]
     
-    subgraph 核心邏輯
-        Bot <--> AI[AI 模組 (ai_helper.py)\n- 意圖識別\n- 自然語言解析]
-        Bot <--> Scraper[爬蟲模組 (scraper.py)\n- 官方 XHR 請求\n- 時段比對]
-        JobQueue[定時排程 JobQueue\n- 每 2 分鐘背景檢查] --> Bot
+    subgraph CoreLogic ["核心邏輯"]
+        Bot <--> AI["AI 模組 (ai_helper.py)<br/>- 意圖識別<br/>- 自然語言解析"]
+        Bot <--> Scraper["爬蟲模組 (scraper.py)<br/>- 官方 XHR 請求<br/>- 時段比對"]
+        JobQueue["定時排程 JobQueue<br/>- 每 2 分鐘背景檢查"] --> Bot
     end
 
-    AI <--> GeminiAPI[(Google Gemini API)]
-    Scraper <--> SportsAPI[(臺北市體育局場地系統)]
+    AI <--> GeminiAPI[("Google Gemini API")]
+    Scraper <--> SportsAPI[("臺北市體育局場地系統")]
 ```
 
 ---
